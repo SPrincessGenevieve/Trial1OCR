@@ -7,6 +7,7 @@ import axios from "axios";
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from "@react-navigation/native";
 import ConstButtonShort from "./ConstButtonShort";
+import stringSimilarity from 'string-similarity';
 
 
 export default function ScanScreen({title, style}) {
@@ -71,7 +72,7 @@ export default function ScanScreen({title, style}) {
             Alert.alert("Please take a picture first.");
             return;
           }
-    
+          
           const apiKey = 'K82216846188957';
           const apiUrl = 'https://api.ocr.space/parse/image';
           const formData = new FormData();
@@ -83,32 +84,49 @@ export default function ScanScreen({title, style}) {
           const response = await axios.post(apiUrl, formData, {
             headers: { 'Content-Type': 'multipart/form-data' }
           });
-    
+            
           if (response?.data?.ParsedResults?.length > 0) {
-            const extractedText = response.data.ParsedResults[0]?.ParsedText || "No text found.";
-    
+            const extractedText = response.data.ParsedResults[0]?.ParsedText || "";
+      
+            // Define field mappings
             const fieldMappings = {
-              "Last Name, First Name, Middle Name": "Name",
-              "Nationality": "PHL",
-              "Sex": "M",
-              "Date of Birth": "1987/10/04",
-              "Weight (kg)": "70",
-              "Height(m)": "1.55",
-              "Address": "UNIT/HOUSE NO. BUILDING, STREET NAME,",
-              "License No": "N03-12-123456",
-              "Expiration Date": "2022/10/04",
-              "Agency Code": "N32",
-              "Blood Type": "O+",
-              "Eyes Color": "BLACK",
-              "Restrictions": "1,2",
-              "Conditions": "NONE"
+              "Name": "Last Name, First Name, Middle Name",
+              "Nationality": "Nationality",
+              "Sex": "Sex",
+              "Date of Birth": "Date of Birth",
+              "Weight": "Weight (kg)",
+              "Height": "Height(m)",
+              "Address": "Address",
+              "License No.": "License No",
+              "Expiration Date": "Expiration Date",
+              "Agency Code": "Agency Code",
+              "Blood Type": "Blood Type",
+              "Eyes Color": "Eyes Color",
+              "Restrictions": "Restrictions",
+              "Conditions": "Conditions",
             };
-    
+      
             const extractedFields = {};
-            for (const [fieldName, fieldValue] of Object.entries(fieldMappings)) {
-              extractedFields[fieldName] = fieldValue;
+      
+            // Split extracted text into lines
+            const lines = extractedText.split(/\r?\n/);
+      
+            // Compare each line to field mappings and extract values
+            for (const line of lines) {
+              const normalizedLine = line.trim();
+              for (const [fieldLabel, fieldKeywords] of Object.entries(fieldMappings)) {
+                const keywords = fieldKeywords.toLowerCase().split(', ');
+                for (const keyword of keywords) {
+                  const similarity = stringSimilarity.compareTwoStrings(keyword, normalizedLine.toLowerCase());
+                  if (similarity > 0.5) {
+                    extractedFields[fieldLabel] = normalizedLine;
+                    console.log(`Matched: ${fieldLabel} (${keyword}) - ${normalizedLine} (Similarity: ${similarity})`);
+                    break;
+                  }
+                }
+              }
             }
-    
+      
             Alert.alert("Extracted Texts", JSON.stringify(extractedFields, null, 2));
             console.log("Extracted Texts:", extractedFields);
           } else {
@@ -118,8 +136,7 @@ export default function ScanScreen({title, style}) {
           console.log("Error extracting text:", error);
           Alert.alert("Error extracting text. Please try again later.");
         }
-      }
-      
+      };
       
 
     if (!getPermission()) {
@@ -263,4 +280,4 @@ const styles = StyleSheet.create({
       color: "green",
       fontSize: 16,
     },
-  });
+});
